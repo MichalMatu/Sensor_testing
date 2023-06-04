@@ -1,100 +1,48 @@
-#include <Wire.h>
-#include <SparkFun_APDS9960.h>
-#include <Adafruit_I2CDevice.h>
+#include "Adafruit_APDS9960.h"
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
-
-// Pins
-#define APDS9960_INT 2 // Needs to be an interrupt pin
-
-// Constants
-
-// Global Variables
-SparkFun_APDS9960 apds = SparkFun_APDS9960();
-int isr_flag = 0;
-
-// Function prototypes
-void interruptRoutine();
-void handleGesture();
+Adafruit_APDS9960 apds;
 
 void setup()
 {
-  // Set interrupt pin as input
-  pinMode(APDS9960_INT, INPUT);
-
-  // Initialize Serial port
   Serial.begin(115200);
-  Serial.println();
-  Serial.println(F("--------------------------------"));
-  Serial.println(F("SparkFun APDS-9960 - GestureTest"));
-  Serial.println(F("--------------------------------"));
 
-  // Initialize interrupt service routine
-  attachInterrupt(0, interruptRoutine, FALLING);
-
-  // Initialize APDS-9960 (configure I2C and initial values)
-  if (apds.init())
+  if (!apds.begin())
   {
-    Serial.println(F("APDS-9960 initialization complete"));
+    Serial.println("failed to initialize device! Please check your wiring.");
   }
   else
-  {
-    Serial.println(F("Something went wrong during APDS-9960 init!"));
-  }
+    Serial.println("Device initialized!");
 
-  // Start running the APDS-9960 gesture sensor engine
-  if (apds.enableGestureSensor(true))
-  {
-    Serial.println(F("Gesture sensor is now running"));
-  }
-  else
-  {
-    Serial.println(F("Something went wrong during gesture sensor init!"));
-  }
+  // enable color sensign mode
+  apds.enableColor(true);
 }
 
 void loop()
 {
-  if (isr_flag == 1)
-  {
-    detachInterrupt(0);
-    handleGesture();
-    isr_flag = 0;
-    attachInterrupt(0, interruptRoutine, FALLING);
-  }
-}
+  // create some variables to store the color data in
+  uint16_t r, g, b, c;
 
-void interruptRoutine()
-{
-  isr_flag = 1;
-}
-
-void handleGesture()
-{
-  if (apds.isGestureAvailable())
+  // wait for color data to be ready
+  while (!apds.colorDataReady())
   {
-    switch (apds.readGesture())
-    {
-    case DIR_UP:
-      Serial.println("UP");
-      break;
-    case DIR_DOWN:
-      Serial.println("DOWN");
-      break;
-    case DIR_LEFT:
-      Serial.println("LEFT");
-      break;
-    case DIR_RIGHT:
-      Serial.println("RIGHT");
-      break;
-    case DIR_NEAR:
-      Serial.println("NEAR");
-      break;
-    case DIR_FAR:
-      Serial.println("FAR");
-      break;
-    default:
-      Serial.println("NONE");
-    }
+    delay(5);
   }
+
+  // get the data and print the different channels
+  apds.getColorData(&r, &g, &b, &c);
+  Serial.print("red: ");
+  Serial.print(r);
+
+  Serial.print(" green: ");
+  Serial.print(g);
+
+  Serial.print(" blue: ");
+  Serial.print(b);
+
+  Serial.print(" clear: ");
+  Serial.println(c);
+  Serial.println();
+
+  delay(500);
 }
