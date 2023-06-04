@@ -1,72 +1,144 @@
-/*********
-  Complete project details at http://randomnerdtutorials.com
-*********/
+/*
+BME280I2C Modes.ino
 
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+This code shows how to use predefined recommended settings from Bosch for
+the BME280I2C environmental sensor.
 
-/*#include <SPI.h>
-#define BME_SCK 18
-#define BME_MISO 19
-#define BME_MOSI 23
-#define BME_CS 5*/
+GNU General Public License
 
-#define SEALEVELPRESSURE_HPA (1013.25)
+Written: Dec 30 2015.
+Last Updated: Sep 23 2017.
 
-Adafruit_BME280 bme; // I2C
-// Adafruit_BME280 bme(BME_CS); // hardware SPI
-// Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
+Connecting the BME280 Sensor:
+Sensor              ->  Board
+-----------------------------
+Vin (Voltage In)    ->  3.3V
+Gnd (Ground)        ->  Gnd
+SDA (Serial Data)   ->  A4 on Uno/Pro-Mini, 20 on Mega2560/Due, 2 Leonardo/Pro-Micro
+SCK (Serial Clock)  ->  A5 on Uno/Pro-Mini, 21 on Mega2560/Due, 3 Leonardo/Pro-Micro
 
-unsigned long delayTime;
+ */
 
+#include <BME280I2C.h>
+#include <Wire.h> // Needed for legacy versions of Arduino.
+#include <SPI.h>
+#include <Arduino.h>
+
+#define SERIAL_BAUD 115200
+
+/* Recommended Modes -
+   Based on Bosch BME280I2C environmental sensor data sheet.
+
+Weather Monitoring :
+   forced mode, 1 sample/minute
+   pressure ×1, temperature ×1, humidity ×1, filter off
+   Current Consumption =  0.16 μA
+   RMS Noise = 3.3 Pa/30 cm, 0.07 %RH
+   Data Output Rate 1/60 Hz
+
+Humidity Sensing :
+   forced mode, 1 sample/second
+   pressure ×0, temperature ×1, humidity ×1, filter off
+   Current Consumption = 2.9 μA
+   RMS Noise = 0.07 %RH
+   Data Output Rate =  1 Hz
+
+Indoor Navigation :
+   normal mode, standby time = 0.5ms
+   pressure ×16, temperature ×2, humidity ×1, filter = x16
+   Current Consumption = 633 μA
+   RMS Noise = 0.2 Pa/1.7 cm
+   Data Output Rate = 25Hz
+   Filter Bandwidth = 0.53 Hz
+   Response Time (75%) = 0.9 s
+
+
+Gaming :
+   normal mode, standby time = 0.5ms
+   pressure ×4, temperature ×1, humidity ×0, filter = x16
+   Current Consumption = 581 μA
+   RMS Noise = 0.3 Pa/2.5 cm
+   Data Output Rate = 83 Hz
+   Filter Bandwidth = 1.75 Hz
+   Response Time (75%) = 0.3 s
+
+*/
+
+BME280I2C::Settings settings(
+    BME280::OSR_X1,
+    BME280::OSR_X1,
+    BME280::OSR_X1,
+    BME280::Mode_Forced,
+    BME280::StandbyTime_1000ms,
+    BME280::Filter_Off,
+    BME280::SpiEnable_False,
+    BME280I2C::I2CAddr_0x76 // I2C address. I2C specific.
+);
+
+BME280I2C bme(settings);
+
+//////////////////////////////////////////////////////////////////
 void setup()
 {
-  Serial.begin(115200);
-  Serial.println(F("BME280 test"));
+    Serial.begin(SERIAL_BAUD);
 
-  bool status;
+    while (!Serial)
+    {
+    } // Wait
 
-  // default settings
-  // (you can also pass in a Wire library object like &Wire2)
-  status = bme.begin(0x76);
-  if (!status)
-  {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1)
-      ;
-  }
+    Wire.begin();
+    while (!bme.begin())
+    {
+        Serial.println("Could not find BME280I2C sensor!");
+        delay(1000);
+    }
 
-  Serial.println("-- Default Test --");
-  delayTime = 1000;
+    switch (bme.chipModel())
+    {
+    case BME280::ChipModel_BME280:
+        Serial.println("Found BME280 sensor! Success.");
+        break;
+    case BME280::ChipModel_BMP280:
+        Serial.println("Found BMP280 sensor! No Humidity available.");
+        break;
+    default:
+        Serial.println("Found UNKNOWN sensor! Error!");
+    }
 
-  Serial.println();
+    // Change some settings before using.
+    settings.tempOSR = BME280::OSR_X4;
+
+    bme.setSettings(settings);
+}
+
+//////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////
+void printBME280Data(
+    Stream *client)
+{
+    float temp(NAN), hum(NAN), pres(NAN);
+
+    BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
+    BME280::PresUnit presUnit(BME280::PresUnit_Pa);
+
+    bme.read(pres, temp, hum, tempUnit, presUnit);
+
+    client->print("Temp: ");
+    client->print(temp);
+    client->print("°" + String(tempUnit == BME280::TempUnit_Celsius ? 'C' : 'F'));
+    client->print("\t\tHumidity: ");
+    client->print(hum);
+    client->print("% RH");
+    client->print("\t\tPressure: ");
+    client->print(pres);
+    client->println("Pa");
+
+    delay(1000);
 }
 
 void loop()
 {
-  Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" *C");
-
-  // Convert temperature to Fahrenheit
-  /*Serial.print("Temperature = ");
-  Serial.print(1.8 * bme.readTemperature() + 32);
-  Serial.println(" *F");*/
-
-  Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-
-  Serial.println();
-
-  delay(delayTime);
+    printBME280Data(&Serial);
+    delay(500);
 }
