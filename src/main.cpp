@@ -1,59 +1,83 @@
 #include <Wire.h>
+#include "Adafruit_VL6180X.h"
+#include <SPI.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_BME680.h>
 
-#define SEALEVELPRESSURE_HPA (1013.25)
-
-Adafruit_BME680 bme; // I2C
+Adafruit_VL6180X vl = Adafruit_VL6180X();
 
 void setup()
 {
   Serial.begin(115200);
-  while (!Serial)
-    ; // for Leonardo/Micro/Zero
 
-  if (!bme.begin(0x77)) // Change address here to 0x77
+  // wait for serial port to open on native usb devices
+  while (!Serial)
   {
-    Serial.println("Could not find a valid BME680 sensor, check wiring!");
+    delay(1);
+  }
+
+  Serial.println("Adafruit VL6180x test!");
+  if (!vl.begin())
+  {
+    Serial.println("Failed to find sensor");
     while (1)
       ;
   }
-
-  // Set up oversampling and filter initialization
-  bme.setTemperatureOversampling(BME680_OS_8X);
-  bme.setHumidityOversampling(BME680_OS_2X);
-  bme.setPressureOversampling(BME680_OS_4X);
-  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
-  bme.setGasHeater(320, 150); // 320*C for 150 ms
+  Serial.println("Sensor found!");
 }
 
 void loop()
 {
-  if (!bme.performReading())
+  float lux = vl.readLux(VL6180X_ALS_GAIN_5);
+
+  Serial.print("Lux: ");
+  Serial.println(lux);
+
+  uint8_t range = vl.readRange();
+  uint8_t status = vl.readRangeStatus();
+
+  if (status == VL6180X_ERROR_NONE)
   {
-    Serial.println("Failed to perform reading :(");
-    return;
+    Serial.print("Range: ");
+    Serial.println(range);
   }
-  Serial.print("Temperature = ");
-  Serial.print(bme.temperature);
-  Serial.println(" *C");
 
-  Serial.print("Humidity = ");
-  Serial.print(bme.humidity);
-  Serial.println(" %");
+  // Some error occurred, print it out!
 
-  Serial.print("Pressure = ");
-  Serial.print(bme.pressure / 100.0);
-  Serial.println(" hPa");
-
-  Serial.print("Gas = ");
-  Serial.print(bme.gas_resistance / 1000.0);
-  Serial.println(" KOhms");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.println();
-  delay(2000);
+  if ((status >= VL6180X_ERROR_SYSERR_1) && (status <= VL6180X_ERROR_SYSERR_5))
+  {
+    Serial.println("System error");
+  }
+  else if (status == VL6180X_ERROR_ECEFAIL)
+  {
+    Serial.println("ECE failure");
+  }
+  else if (status == VL6180X_ERROR_NOCONVERGE)
+  {
+    Serial.println("No convergence");
+  }
+  else if (status == VL6180X_ERROR_RANGEIGNORE)
+  {
+    Serial.println("Ignoring range");
+  }
+  else if (status == VL6180X_ERROR_SNR)
+  {
+    Serial.println("Signal/Noise error");
+  }
+  else if (status == VL6180X_ERROR_RAWUFLOW)
+  {
+    Serial.println("Raw reading underflow");
+  }
+  else if (status == VL6180X_ERROR_RAWOFLOW)
+  {
+    Serial.println("Raw reading overflow");
+  }
+  else if (status == VL6180X_ERROR_RANGEUFLOW)
+  {
+    Serial.println("Range reading underflow");
+  }
+  else if (status == VL6180X_ERROR_RANGEOFLOW)
+  {
+    Serial.println("Range reading overflow");
+  }
+  delay(500);
 }
