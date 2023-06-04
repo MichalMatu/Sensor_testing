@@ -1,72 +1,31 @@
-/*********
-  Complete project details at http://randomnerdtutorials.com
-*********/
+#include <Adafruit_AHTX0.h>
 
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
-
-/*#include <SPI.h>
-#define BME_SCK 18
-#define BME_MISO 19
-#define BME_MOSI 23
-#define BME_CS 5*/
-
-#define SEALEVELPRESSURE_HPA (1013.25)
-
-Adafruit_BME280 bme; // I2C
-// Adafruit_BME280 bme(BME_CS); // hardware SPI
-// Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
-
-unsigned long delayTime;
+Adafruit_AHTX0 aht;
 
 void setup()
 {
   Serial.begin(115200);
-  Serial.println(F("BME280 test"));
+  Serial.println("Adafruit AHT10/AHT20 demo!");
 
-  bool status;
-
-  // default settings
-  // (you can also pass in a Wire library object like &Wire2)
-  status = bme.begin(0x76);
-  if (!status)
+  if (!aht.begin())
   {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    Serial.println("Could not find AHT? Check wiring");
     while (1)
-      ;
+      delay(10);
   }
-
-  Serial.println("-- Default Test --");
-  delayTime = 1000;
-
-  Serial.println();
+  Serial.println("AHT10 or AHT20 found");
 }
 
 void loop()
 {
-  Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" *C");
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp); // populate temp and humidity objects with fresh data
+  Serial.print("Temperature: ");
+  Serial.print(temp.temperature);
+  Serial.println(" degrees C");
+  Serial.print("Humidity: ");
+  Serial.print(humidity.relative_humidity);
+  Serial.println("% rH");
 
-  // Convert temperature to Fahrenheit
-  /*Serial.print("Temperature = ");
-  Serial.print(1.8 * bme.readTemperature() + 32);
-  Serial.println(" *F");*/
-
-  Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-
-  Serial.println();
-
-  delay(delayTime);
+  delay(500);
 }
