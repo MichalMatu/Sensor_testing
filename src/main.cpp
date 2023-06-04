@@ -1,31 +1,58 @@
-#include <Adafruit_AHTX0.h>
+#include <Wire.h>
+#include <Arduino.h>
 
-Adafruit_AHTX0 aht;
+#define AHT21B_ADDRESS 0x38 // I2C address of AHT21B sensor
 
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("Adafruit AHT10/AHT20 demo!");
-
-  if (!aht.begin())
-  {
-    Serial.println("Could not find AHT? Check wiring");
-    while (1)
-      delay(10);
-  }
-  Serial.println("AHT10 or AHT20 found");
+  Wire.begin();
 }
 
 void loop()
 {
-  sensors_event_t humidity, temp;
-  aht.getEvent(&humidity, &temp); // populate temp and humidity objects with fresh data
-  Serial.print("Temperature: ");
-  Serial.print(temp.temperature);
-  Serial.println(" degrees C");
-  Serial.print("Humidity: ");
-  Serial.print(humidity.relative_humidity);
-  Serial.println("% rH");
+  // Start a measurement
+  Wire.beginTransmission(AHT21B_ADDRESS);
+  Wire.write(0xAC); // Send measurement command
+  Wire.write(0x33); // Trigger a humidity and temperature measurement
+  Wire.endTransmission();
 
-  delay(500);
+  delay(100); // Wait for measurement to complete (adjust if necessary)
+
+  // Request data from the sensor
+  Wire.beginTransmission(AHT21B_ADDRESS);
+  Wire.write(0x00); // Send data request command
+  Wire.endTransmission();
+
+  // Read the data from the sensor
+  Wire.requestFrom(AHT21B_ADDRESS, 6);
+  if (Wire.available() == 6)
+  {
+    uint8_t data[6];
+    for (int i = 0; i < 6; i++)
+    {
+      data[i] = Wire.read();
+    }
+
+    // Convert the data to temperature and humidity values
+    int32_t rawHumidity = ((int32_t)data[1] << 12) | ((int32_t)data[2] << 4) | ((int32_t)data[3] >> 4);
+    int32_t rawTemperature = ((int32_t)data[3] & 0x0F) | ((int32_t)data[4] << 4) | ((int32_t)data[5] << 12);
+
+    float humidity = (float)rawHumidity * 100 / 0x100000;
+    float temperature = (float)rawTemperature * 200 / 0x100000 - 50;
+
+    // Display the temperature and humidity values in the serial monitor
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println(" °C");
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.println(" %");
+  }
+  else
+  {
+    Serial.println("Error: Failed to read data from AHT21B sensor!");
+  }
+
+  delay(5000); // Wait for 5 seconds before taking the next measurement
 }
