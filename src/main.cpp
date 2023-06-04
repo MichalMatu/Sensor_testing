@@ -1,83 +1,100 @@
 #include <Wire.h>
-#include "Adafruit_VL6180X.h"
+#include <SparkFun_APDS9960.h>
+#include <Adafruit_I2CDevice.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 
-Adafruit_VL6180X vl = Adafruit_VL6180X();
+// Pins
+#define APDS9960_INT 2 // Needs to be an interrupt pin
+
+// Constants
+
+// Global Variables
+SparkFun_APDS9960 apds = SparkFun_APDS9960();
+int isr_flag = 0;
+
+// Function prototypes
+void interruptRoutine();
+void handleGesture();
 
 void setup()
 {
+  // Set interrupt pin as input
+  pinMode(APDS9960_INT, INPUT);
+
+  // Initialize Serial port
   Serial.begin(115200);
+  Serial.println();
+  Serial.println(F("--------------------------------"));
+  Serial.println(F("SparkFun APDS-9960 - GestureTest"));
+  Serial.println(F("--------------------------------"));
 
-  // wait for serial port to open on native usb devices
-  while (!Serial)
+  // Initialize interrupt service routine
+  attachInterrupt(0, interruptRoutine, FALLING);
+
+  // Initialize APDS-9960 (configure I2C and initial values)
+  if (apds.init())
   {
-    delay(1);
+    Serial.println(F("APDS-9960 initialization complete"));
+  }
+  else
+  {
+    Serial.println(F("Something went wrong during APDS-9960 init!"));
   }
 
-  Serial.println("Adafruit VL6180x test!");
-  if (!vl.begin())
+  // Start running the APDS-9960 gesture sensor engine
+  if (apds.enableGestureSensor(true))
   {
-    Serial.println("Failed to find sensor");
-    while (1)
-      ;
+    Serial.println(F("Gesture sensor is now running"));
   }
-  Serial.println("Sensor found!");
+  else
+  {
+    Serial.println(F("Something went wrong during gesture sensor init!"));
+  }
 }
 
 void loop()
 {
-  float lux = vl.readLux(VL6180X_ALS_GAIN_5);
+  if (isr_flag == 1)
+  {
+    detachInterrupt(0);
+    handleGesture();
+    isr_flag = 0;
+    attachInterrupt(0, interruptRoutine, FALLING);
+  }
+}
 
-  Serial.print("Lux: ");
-  Serial.println(lux);
+void interruptRoutine()
+{
+  isr_flag = 1;
+}
 
-  uint8_t range = vl.readRange();
-  uint8_t status = vl.readRangeStatus();
-
-  if (status == VL6180X_ERROR_NONE)
+void handleGesture()
+{
+  if (apds.isGestureAvailable())
   {
-    Serial.print("Range: ");
-    Serial.println(range);
+    switch (apds.readGesture())
+    {
+    case DIR_UP:
+      Serial.println("UP");
+      break;
+    case DIR_DOWN:
+      Serial.println("DOWN");
+      break;
+    case DIR_LEFT:
+      Serial.println("LEFT");
+      break;
+    case DIR_RIGHT:
+      Serial.println("RIGHT");
+      break;
+    case DIR_NEAR:
+      Serial.println("NEAR");
+      break;
+    case DIR_FAR:
+      Serial.println("FAR");
+      break;
+    default:
+      Serial.println("NONE");
+    }
   }
-
-  // Some error occurred, print it out!
-
-  if ((status >= VL6180X_ERROR_SYSERR_1) && (status <= VL6180X_ERROR_SYSERR_5))
-  {
-    Serial.println("System error");
-  }
-  else if (status == VL6180X_ERROR_ECEFAIL)
-  {
-    Serial.println("ECE failure");
-  }
-  else if (status == VL6180X_ERROR_NOCONVERGE)
-  {
-    Serial.println("No convergence");
-  }
-  else if (status == VL6180X_ERROR_RANGEIGNORE)
-  {
-    Serial.println("Ignoring range");
-  }
-  else if (status == VL6180X_ERROR_SNR)
-  {
-    Serial.println("Signal/Noise error");
-  }
-  else if (status == VL6180X_ERROR_RAWUFLOW)
-  {
-    Serial.println("Raw reading underflow");
-  }
-  else if (status == VL6180X_ERROR_RAWOFLOW)
-  {
-    Serial.println("Raw reading overflow");
-  }
-  else if (status == VL6180X_ERROR_RANGEUFLOW)
-  {
-    Serial.println("Range reading underflow");
-  }
-  else if (status == VL6180X_ERROR_RANGEOFLOW)
-  {
-    Serial.println("Range reading overflow");
-  }
-  delay(500);
 }
