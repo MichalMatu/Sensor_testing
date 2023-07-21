@@ -1,59 +1,38 @@
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME680.h>
+#include <SPI.h>
+#include <SD.h>
 
-#define SEALEVELPRESSURE_HPA (1013.25)
-
-Adafruit_BME680 bme; // I2C
+// Chip select pin for the SD card module
+const int chipSelect = 6;
 
 void setup()
 {
   Serial.begin(115200);
-  while (!Serial)
-    ; // for Leonardo/Micro/Zero
 
-  if (!bme.begin(0x77)) // Change address here to 0x77
+  // Initialize SD card
+  if (!SD.begin(chipSelect))
   {
-    Serial.println("Could not find a valid BME680 sensor, check wiring!");
-    while (1)
-      ;
+    Serial.println("Card Mount Failed");
+    return;
   }
+  Serial.println("Card Initialized");
 
-  // Set up oversampling and filter initialization
-  bme.setTemperatureOversampling(BME680_OS_8X);
-  bme.setHumidityOversampling(BME680_OS_2X);
-  bme.setPressureOversampling(BME680_OS_4X);
-  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
-  bme.setGasHeater(320, 150); // 320*C for 150 ms
+  // Create and open a file on the SD card
+  File dataFile = SD.open("/data.txt", FILE_WRITE);
+
+  // If the file is available, write to it
+  if (dataFile)
+  {
+    dataFile.println("Hello, this is data being written to the SD card!");
+    dataFile.close();
+    Serial.println("Data written to the file.");
+  }
+  else
+  {
+    Serial.println("Error opening file.");
+  }
 }
 
 void loop()
 {
-  if (!bme.performReading())
-  {
-    Serial.println("Failed to perform reading :(");
-    return;
-  }
-  Serial.print("Temperature = ");
-  Serial.print(bme.temperature);
-  Serial.println(" *C");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.humidity);
-  Serial.println(" %");
-
-  Serial.print("Pressure = ");
-  Serial.print(bme.pressure / 100.0);
-  Serial.println(" hPa");
-
-  Serial.print("Gas = ");
-  Serial.print(bme.gas_resistance / 1000.0);
-  Serial.println(" KOhms");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.println();
-  delay(2000);
+  // Nothing to do here
 }
